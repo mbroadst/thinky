@@ -16,9 +16,10 @@ var modelNames = Object.keys(modelNameSet);
 var cleanTables = function(done) {
   var promises = [];
   var name;
-  for(var name in modelNameSet) {
+  for (name in modelNameSet) {
     promises.push(r.table(name).delete().run());
   }
+
   Promise.settle(promises).error(function () {/*ignore*/}).finally(function() {
     // Add the links table
     for(var model in thinky.models) {
@@ -28,62 +29,87 @@ var cleanTables = function(done) {
     thinky._clean();
     done();
   });
-}
+};
 
-describe('createModel', function(){
+describe('createModel', function() {
   afterEach(cleanTables);
 
   var model;
-  it('Create a new model', function(){
-    model = thinky.createModel(modelNames[0], {id: String, name: String})
+  it('Create a new model', function() {
+    model = thinky.createModel(modelNames[0], {
+      id: String, name: String
+    });
     assert(model);
   });
-  it('Check if the table was created', function(done){
-    model.once("ready", function() {
-      r.tableList().run().then(function(result) {
-        assert.notEqual(result.indexOf(modelNames[0]), -1)
-        done();
-      }).error(done)
-    });
-  });
-  it('Create multiple models', function(done) {
-    var model1 = thinky.createModel(modelNames[0], {id: String, name: String})
 
-    var model2 = thinky.createModel(modelNames[1], {id: String, name: String})
+  it('Check if the table was created', function(){
+    return model.ready()
+      .then(function() {
+        return r.tableList().run();
+      })
+      .then(function(result) {
+        assert.notEqual(result.indexOf(modelNames[0]), -1);
+      });
+  });
+
+  it('Create multiple models', function() {
+    var model1 = thinky.createModel(modelNames[0], {
+      id: String, name: String
+    });
+
+    var model2 = thinky.createModel(modelNames[1], {
+      id: String, name: String
+    });
 
     assert(model1 !== model2);
-    model2.once('ready', function() {
-      // TODO Remove when tableWait is implemented on the server
-      // Make sure that modelNames[1] is ready for the next tests
-      // (since we do not recreate the tables)
-      done();
-    });
-  });
-  it('Check if the table was created', function(done){
-    model = thinky.createModel("nonExistingTable", {id: String, name: String}, {init: false})
-    model.get(1).run().then(function() { done(new Error("Expecting error")) }).error(function(e) {
-      assert(e.message.match(/^Table `.*` does not exist in/));
-      done();
-    });
+    return model2.ready();
   });
 
+  it('Check if the table was created', function(done){
+    model = thinky.createModel("nonExistingTable", {
+      id: String, name: String
+    }, {
+      init: false
+    });
+
+    return model.get(1).run()
+      .then(function() {
+        done(new Error("Expecting error"));
+      })
+      .error(function(e) {
+        assert(e.message.match(/^Table `.*` does not exist in/));
+        done();
+      });
+  });
 });
-describe('[_]getModel', function(){
+
+describe('[_]getModel', function() {
   afterEach(cleanTables);
 
-  it('_getModel', function(){
+  it('_getModel', function() {
     var name = util.s8();
-    var model = thinky.createModel(modelNames[0], {id: String, name: String}, {init: false})
+    var model = thinky.createModel(modelNames[0], {
+      id: String, name: String
+    }, {
+      init: false
+    });
+
     assert(model._getModel().hasOwnProperty('_name'));
   });
-  it('getTableName', function(){
+
+  it('getTableName', function() {
     var name = util.s8();
-    var model = thinky.createModel(modelNames[0], {id: String, name: String}, {init: false})
+    var model = thinky.createModel(modelNames[0], {
+      id: String, name: String
+    }, {
+      init: false
+    });
+
     assert(model.__proto__.__proto__.hasOwnProperty('getTableName'));
     assert.equal(model.getTableName(), modelNames[0]);
   });
-
 });
+
 describe('Model', function() {
   after(cleanTables);
 
@@ -93,11 +119,12 @@ describe('Model', function() {
   it('Create a new instance of the Model', function() {
     Model = thinky.createModel(modelNames[0], { str: String });
     var str = util.s8();
-    var doc = new Model({str: str});
+    var doc = new Model({ str: str });
 
     assert(util.isPlainObject(doc));
     assert.equal(doc.str, str);
   });
+
   it('Create multiple instances from the same document', function() {
     var str = util.s8();
     var num = util.random();
@@ -115,6 +142,7 @@ describe('Model', function() {
     assert.notStrictEqual(anotherDoc, otherDoc);
     assert.notStrictEqual(anotherDoc, doc);
   });
+
   it('Create two instances with the same argument of the Model', function() {
     var str = util.s8();
     var docValues = {str: str};
@@ -136,6 +164,7 @@ describe('Model', function() {
     assert.equal(doc1.str, str1);
     assert.notEqual(doc1, doc2);
   });
+
   it('Two instances should have different prototypes', function() {
     var str1 = util.s8();
     var str2 = util.s8();
@@ -144,6 +173,7 @@ describe('Model', function() {
 
     assert.notEqual(doc1.__proto__, doc2.__proto__);
   });
+
   it('Two instances should have the same model', function() {
     var str1 = util.s8();
     var str2 = util.s8();
@@ -175,114 +205,117 @@ describe('Model', function() {
 describe("Batch insert", function() {
   afterEach(cleanTables);
 
-  it('insert should work with a single doc', function(done) {
+  it('insert should work with a single doc', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
       num: Number
     });
-    Model.save({id: "foo"}).then(function(result) {
-      assert.deepEqual(result, {id: "foo"});
-      done();
-    }).error(function(e) {
-      done(e);
-    });
-  });
-  it('Batch insert should work', function(done) {
-    var Model = thinky.createModel(modelNames[0], {
-      id: String,
-      num: Number
-    });
-    var docs = [];
-    for(var i=0; i<10; i++) {
-      docs.push({num: i})
-    }
-    Model.save(docs).then(function(result) {
-      assert.strictEqual(result, docs);
-      for(i=0; i<10; i++) {
-        assert.equal(typeof docs[i].id, 'string');
-        assert(docs[i].isSaved());
-      }
-      done();
-    }).error(function(e) {
-      done(e);
-    });
-  });
-  it('Batch insert should validate fields before saving', function(done) {
-    var Model = thinky.createModel(modelNames[0], {
-      id: String,
-      num: Number
-    });
-    Model.save([{id: 4}]).error(function(err) {
-      assert.equal(err.message, "One of the documents is not valid. Original error:\nValue for [id] must be a string or null.");
-      assert(err instanceof Errors.ValidationError);
-      done();
-    });
+
+    return Model.save({id: "foo"})
+      .then(function(result) {
+        assert.deepEqual(result, {id: "foo"});
+      });
   });
 
-  it('Batch insert should properly error is __one__ insert fails', function(done) {
+  it('Batch insert should work', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
       num: Number
     });
-    Model.save([{id: '4'}]).then(function(result) {
-      assert.equal(result[0].id, 4);
-      var docs = [];
-      for(var i=0; i<10; i++) {
-        docs.push({num: i, id: ""+i})
-      }
-      Model.save(docs).then(function() {
-        done(new Error("Was expecting an error"));
-      }).error(function(e) {
-        assert(e.message.match(/An error occurred during the batch insert/));
-        done();
+
+    var docs = [];
+    for(var i=0; i<10; i++) {
+      docs.push({ num: i });
+    }
+
+    return Model.save(docs)
+      .then(function(result) {
+        assert.strictEqual(result, docs);
+        for(i=0; i<10; i++) {
+          assert.equal(typeof docs[i].id, 'string');
+          assert(docs[i].isSaved());
+        }
       });
-    });
   });
-  it('Should generate savable copies', function(done) {
+
+  it('Batch insert should validate fields before saving', function() {
+    var Model = thinky.createModel(modelNames[0], {
+      id: String,
+      num: Number
+    });
+
+    return Model.save([{id: 4}])
+      .error(function(err) {
+        assert.equal(err.message, "One of the documents is not valid. Original error:\nValue for [id] must be a string or null.");
+        assert(err instanceof Errors.ValidationError);
+      });
+  });
+
+  it('Batch insert should properly error is __one__ insert fails', function() {
+    var Model = thinky.createModel(modelNames[0], {
+      id: String,
+      num: Number
+    });
+
+    return Model.save([{id: '4'}])
+      .then(function(result) {
+        assert.equal(result[0].id, 4);
+        var docs = [];
+        for(var i=0; i<10; i++) {
+          docs.push({num: i, id: ""+i});
+        }
+
+        return Model.save(docs);
+      })
+      .error(function(e) {
+        assert(e.message.match(/An error occurred during the batch insert/));
+      });
+  });
+
+  it('Should generate savable copies', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
       location: type.point()
     });
-    Model.save({id: "foo", location: [1,2]}).then(function(result) {
-      assert.equal(result.id, "foo");
-      assert.equal(result.location.$reql_type$, "GEOMETRY");
-      done();
-    }).error(function(e) {
-      done(e);
-    });
+
+    return Model.save({id: "foo", location: [1,2]})
+      .then(function(result) {
+        assert.equal(result.id, "foo");
+        assert.equal(result.location.$reql_type$, "GEOMETRY");
+      });
   });
-  it('Model.save should handle options - update', function(done) {
+
+  it('Model.save should handle options - update', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
       num: Number
     });
-    Model.save({id: "foo"}).then(function(result) {
-      assert.equal(result.id, "foo");
-      return Model.save({id: "foo", bar: "buzz"}, {conflict: 'update'});
-    }).then(function(result) {
-      assert.deepEqual(result, {id: "foo", bar: "buzz"});
-      done();
-    }).error(function(e) {
-      done(e);
-    });
+
+    return Model.save({id: "foo"})
+      .then(function(result) {
+        assert.equal(result.id, "foo");
+        return Model.save({id: "foo", bar: "buzz"}, {conflict: 'update'});
+      })
+      .then(function(result) {
+        assert.deepEqual(result, {id: "foo", bar: "buzz"});
+      });
   });
-  it('Model.save should handle options - replace', function(done) {
+
+  it('Model.save should handle options - replace', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
       num: Number
     });
-    Model.save({id: "foo", bar: "buzz"}).then(function(result) {
-      assert.equal(result.id, "foo");
-      return Model.save({id: "foo"}, {conflict: 'replace'});
-    }).then(function(result) {
-      assert.deepEqual(result, {id: "foo"});
-      done();
-    }).error(function(e) {
-      done(e);
-    });
+
+    return Model.save({id: "foo", bar: "buzz"})
+      .then(function(result) {
+        assert.equal(result.id, "foo");
+        return Model.save({id: "foo"}, {conflict: 'replace'});
+      })
+      .then(function(result) {
+        assert.deepEqual(result, {id: "foo"});
+      });
   });
-
-
 });
 
 describe("Joins", function() {
@@ -290,262 +323,294 @@ describe("Joins", function() {
 
   it('hasOne should save the join', function() {
     var model = thinky.createModel(modelNames[0], { id: String});
-
     var otherModel = thinky.createModel(modelNames[1], { id: String, otherId: String });
-
     model.hasOne(otherModel, "otherDoc", "id", "otherId");
-    assert(model._getModel()._joins["otherDoc"])
+
+    assert(model._getModel()._joins.otherDoc);
   });
+
   it('hasOne should throw if it uses a field already used by another relation', function(done) {
     var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
+    var otherModel = thinky.createModel(modelNames[1], {
+      id: String,
+      otherId: String
+    }, {
+      init: false
+    });
 
-    var otherModel = thinky.createModel(modelNames[1], { id: String, otherId: String }, {init: false});
+    var anotherModel = thinky.createModel(modelNames[2], {
+      id: String,
+      otherId: String
+    }, {
+      init: false
+    });
 
-    var anotherModel = thinky.createModel(modelNames[2], { id: String, otherId: String }, {init: false});
+    model.hasOne(otherModel, "otherDoc", "id", "otherId", { init: false });
 
-
-    model.hasOne(otherModel, "otherDoc", "id", "otherId", {init: false});
-    try{
+    try {
       model.hasOne(anotherModel, "otherDoc", "id", "otherId");
-    }
-    catch(err) {
-      assert.equal(err.message, "The field `otherDoc` is already used by another relation.")
+    } catch(err) {
+      assert.equal(err.message, "The field `otherDoc` is already used by another relation.");
       done();
     }
   });
+
   it('belongsTo should throw if it uses a field already used by another relation', function(done) {
     var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
+    var otherModel = thinky.createModel(modelNames[1], {
+      id: String, otherId: String
+    }, {
+      init: false
+    });
 
-    var otherModel = thinky.createModel(modelNames[1], { id: String, otherId: String }, {init: false});
+    var anotherModel = thinky.createModel(modelNames[2], {
+      id: String,
+      otherId: String
+    }, {
+      init: false
+    });
 
-    var anotherModel = thinky.createModel(modelNames[2], { id: String, otherId: String }, {init: false});
 
-
-    model.belongsTo(otherModel, "otherDoc", "id", "otherId", {init: false});
-    try{
+    model.belongsTo(otherModel, "otherDoc", "id", "otherId", { init: false });
+    try {
       model.belongsTo(anotherModel, "otherDoc", "id", "otherId");
-    }
-    catch(err) {
-      assert.equal(err.message, "The field `otherDoc` is already used by another relation.")
+    } catch(err) {
+      assert.equal(err.message, "The field `otherDoc` is already used by another relation.");
       done();
     }
   });
+
   it('hasMany should throw if it uses a field already used by another relation', function(done) {
     var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
+    var otherModel = thinky.createModel(modelNames[1], {
+      id: String,
+      otherId: String
+    }, {
+      init: false
+    });
 
-    var otherModel = thinky.createModel(modelNames[1], { id: String, otherId: String }, {init: false});
+    var anotherModel = thinky.createModel(modelNames[2], {
+      id: String,
+      otherId: String
+    }, {
+      init: false
+    });
 
-    var anotherModel = thinky.createModel(modelNames[2], { id: String, otherId: String }, {init: false});
-
-
-    model.hasMany(otherModel, "otherDoc", "id", "otherId", {init: false});
-    try{
+    model.hasMany(otherModel, "otherDoc", "id", "otherId", { init: false });
+    try {
       model.hasMany(anotherModel, "otherDoc", "id", "otherId");
-    }
-    catch(err) {
-      assert.equal(err.message, "The field `otherDoc` is already used by another relation.")
+    } catch(err) {
+      assert.equal(err.message, "The field `otherDoc` is already used by another relation.");
       done();
     }
   });
-  it('hasAndBelongsToMany should throw if it uses a field already used by another relation', function(done) {
-    var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
 
-    var otherModel = thinky.createModel(modelNames[1], { id: String, otherId: String }, {init: false});
+  it('hasAndBelongsToMany should throw if it uses a field already used by another relation', function() {
+    var model = thinky.createModel(modelNames[0], { id: String}, { init: false });
+    var otherModel = thinky.createModel(modelNames[1], {
+      id: String,
+      otherId: String
+    }, {
+      init: false
+    });
 
-    var anotherModel = thinky.createModel(modelNames[2], { id: String, otherId: String }, {init: false});
+    var anotherModel = thinky.createModel(modelNames[2], {
+      id: String,
+      otherId: String
+    }, {
+      init: false
+    });
 
-
-    model.hasAndBelongsToMany(otherModel, "otherDoc", "id", "otherId", {init: false});
-    try{
+    model.hasAndBelongsToMany(otherModel, "otherDoc", "id", "otherId", { init: false });
+    try {
       model.hasAndBelongsToMany(anotherModel, "otherDoc", "id", "otherId");
-    }
-    catch(err) {
-      assert.equal(err.message, "The field `otherDoc` is already used by another relation.")
+    } catch(err) {
+      assert.equal(err.message, "The field `otherDoc` is already used by another relation.");
+
       // Wait for the link table to be ready since we wont' drop/recreate the table
-      thinky.models[model._getModel()._joins["otherDoc"].link].once('ready', function() {
-        // TODO Remove when tableWait is implemented on the server
-        done();
-      })
+      // TODO: Remove when tableWait is implemented on the server
+      var linkModel = thinky.models[model._getModel()._joins.otherDoc.link];
+      return linkModel.ready();
     }
   });
-  it('hasOne should throw if the first argument is not a model', function(done) {
-    var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
 
-    try{
+  it('hasOne should throw if the first argument is not a model', function(done) {
+    var model = thinky.createModel(modelNames[0], { id: String }, { init: false });
+
+    try {
       model.hasOne(function() {}, "otherDoc", "otherId", "id");
-    }
-    catch(err) {
+    } catch(err) {
       assert.equal(err.message, "First argument of `hasOne` must be a Model");
       done();
     }
   });
-  it('belongsTo should throw if the first argument is not a model', function(done) {
-    var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
 
-    try{
+  it('belongsTo should throw if the first argument is not a model', function(done) {
+    var model = thinky.createModel(modelNames[0], { id: String }, { init: false });
+
+    try {
       model.belongsTo(function() {}, "otherDoc", "otherId", "id");
-    }
-    catch(err) {
+    } catch(err) {
       assert.equal(err.message, "First argument of `belongsTo` must be a Model");
       done();
     }
   });
-  it('hasMany should throw if the first argument is not a model', function(done) {
-    var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
 
-    try{
+  it('hasMany should throw if the first argument is not a model', function(done) {
+    var model = thinky.createModel(modelNames[0], { id: String }, { init: false });
+
+    try {
       model.hasMany(function() {}, "otherDoc", "otherId", "id");
-    }
-    catch(err) {
+    } catch(err) {
       assert.equal(err.message, "First argument of `hasMany` must be a Model");
       done();
     }
   });
-  it('hasAndBelongsToMany should throw if the first argument is not a model', function(done) {
-    var model = thinky.createModel(modelNames[0], { id: String}, {init: false});
 
-    try{
+  it('hasAndBelongsToMany should throw if the first argument is not a model', function(done) {
+    var model = thinky.createModel(modelNames[0], { id: String }, { init: false });
+
+    try {
       model.hasAndBelongsToMany(function() {}, "otherDoc", "otherId", "id");
-    }
-    catch(err) {
+    } catch(err) {
       assert.equal(err.message, "First argument of `hasAndBelongsToMany` must be a Model");
       done();
     }
   });
-  it('hasOne should create an index on the other model', function(done) {
-    var model = thinky.createModel(modelNames[0], { id: String, foreignKeyName: String });
+
+  it('hasOne should create an index on the other model', function() {
+    var model = thinky.createModel(modelNames[0], {
+      id: String,
+      foreignKeyName: String
+    });
 
     var foreignKey = util.s8();
-
-    var schema = {id: String};
+    var schema = { id: String };
     schema[foreignKey] = String;
     var otherModel = thinky.createModel(modelNames[1], schema);
 
     model.hasOne(otherModel, "otherDoc", "modelId", foreignKey);
 
-    otherModel.once("ready", function() {
-      r.table(otherModel.getTableName()).indexList().run().then(function(result) {
-        r.table(otherModel.getTableName()).indexWait(foreignKey).run().then(function() {
-          done();
-        }).error(done);
-      }).error(done);
-    })
+    return otherModel.ready()
+      .then(function() {
+        return Promise.all([
+          r.table(otherModel.getTableName()).indexList().run(),
+          r.table(otherModel.getTableName()).indexWait(foreignKey).run()
+        ]);
+      });
   });
-  it('BelongsTo should create an index on the other model', function(done) {
-    var model = thinky.createModel(modelNames[0], { id: String, otherId: String });
+
+  it('BelongsTo should create an index on the other model', function() {
+    var model = thinky.createModel(modelNames[0], {
+      id: String,
+      otherId: String
+    });
 
     var foreignKey = util.s8();
-
-    var schema = {id: String};
+    var schema = { id: String };
     schema[foreignKey] = String;
     var otherModel = thinky.createModel(modelNames[1], schema);
 
     model.belongsTo(otherModel, "otherDoc", foreignKey, "otherId");
 
-    otherModel.once("ready", function() {
-      r.table(otherModel.getTableName()).indexList().run().then(function(result) {
-        r.table(otherModel.getTableName()).indexWait('otherId').run().then(function() {
-          done();
-        }).error(done);
-      }).error(done);
-    })
+    return otherModel.ready()
+      .then(function() {
+        return Promise.all([
+          r.table(otherModel.getTableName()).indexList().run(),
+          r.table(otherModel.getTableName()).indexWait('otherId').run()
+        ]);
+      });
   });
-  it('hasMany should create an index on the other model', function(done) {
+
+  it('hasMany should create an index on the other model', function() {
     var model = thinky.createModel(modelNames[0], { id: String });
 
     var foreignKey = util.s8();
 
     var otherName = util.s8();
-    var schema = {id: String};
+    var schema = { id: String };
     schema[foreignKey] = String;
     var otherModel = thinky.createModel(modelNames[1], schema);
 
     model.hasMany(otherModel, "otherDocs", "modelId", foreignKey);
 
-    otherModel.once("ready", function() {
-      r.table(otherModel.getTableName()).indexList().run().then(function(result) {
-        r.table(otherModel.getTableName()).indexWait(foreignKey).run().then(function() {
-          done();
-        }).error(done);
-
-      }).error(done);
-    })
+    return otherModel.ready()
+      .then(function() {
+        return Promise.all([
+          r.table(otherModel.getTableName()).indexList().run(),
+          r.table(otherModel.getTableName()).indexWait(foreignKey).run()
+        ]);
+      });
   });
 
-  it('hasAndBelongsToMany should create an index on this table', function(done) {
+  it('hasAndBelongsToMany should create an index on this table', function() {
     var model = thinky.createModel(modelNames[0], { id: String, notid1: String });
-
     var otherModel = thinky.createModel(modelNames[1], { id: String, notid2: String });
 
     model.hasAndBelongsToMany(otherModel, "otherDocs", "notid1", "notid2");
 
     var linkName;
-    if(model.getTableName() < otherModel.getTableName()) {
-      linkName = model.getTableName()+"_"+otherModel.getTableName();
-    }
-    else {
-      linkName = otherModel.getTableName()+"_"+model.getTableName();
+    if (model.getTableName() < otherModel.getTableName()) {
+      linkName = model.getTableName() + "_" + otherModel.getTableName();
+    } else {
+      linkName = otherModel.getTableName() + "_" + model.getTableName();
     }
 
-    model.once("ready", function() {
-      r.table(model.getTableName()).indexList().run().then(function(result) {
-        r.table(model.getTableName()).indexWait("notid1").run().then(function() {
-          done();
-        }).error(done);
-
-      }).error(done);
-    })
+    return model.ready()
+      .then(function() {
+        return Promise.all([
+          r.table(model.getTableName()).indexList().run(),
+          r.table(model.getTableName()).indexWait("notid1").run()
+        ]);
+      });
   });
 
-  it('hasAndBelongsToMany should create an index on the joined table', function(done) {
+  it('hasAndBelongsToMany should create an index on the joined table', function() {
     var model = thinky.createModel(modelNames[0], { id: String, notid1: String });
-
     var otherModel = thinky.createModel(modelNames[1], { id: String, notid2: String });
 
     model.hasAndBelongsToMany(otherModel, "otherDocs", "notid1", "notid2");
 
     var linkName;
-    if(model.getTableName() < otherModel.getTableName()) {
-      linkName = model.getTableName()+"_"+otherModel.getTableName();
-    }
-    else {
-      linkName = otherModel.getTableName()+"_"+model.getTableName();
+    if (model.getTableName() < otherModel.getTableName()) {
+      linkName = model.getTableName() + "_" + otherModel.getTableName();
+    } else {
+      linkName = otherModel.getTableName() + "_" + model.getTableName();
     }
 
-    otherModel.once("ready", function() {
-      r.table(otherModel.getTableName()).indexList().run().then(function(result) {
-        r.table(otherModel.getTableName()).indexWait("notid2").run().then(function() {
-          done();
-        }).error(done);
-      }).error(done);
-    })
+    return otherModel.ready()
+      .then(function() {
+        return Promise.all([
+          r.table(otherModel.getTableName()).indexList().run(),
+          r.table(otherModel.getTableName()).indexWait("notid2").run()
+        ]);
+      });
   });
 
-  it('hasAndBelongsToMany should create a linked table with indexes', function(done) {
+  it('hasAndBelongsToMany should create a linked table with indexes', function() {
     var model = thinky.createModel(modelNames[0], { id: String, notid1: String });
-
     var otherModel = thinky.createModel(modelNames[1], { id: String, notid2: String });
 
     model.hasAndBelongsToMany(otherModel, "otherDocs", "notid1", "notid2");
 
     var linkName;
-    if(model.getTableName() < otherModel.getTableName()) {
-      linkName = model.getTableName()+"_"+otherModel.getTableName();
-    }
-    else {
-      linkName = otherModel.getTableName()+"_"+model.getTableName();
+    if (model.getTableName() < otherModel.getTableName()) {
+      linkName = model.getTableName() + "_" + otherModel.getTableName();
+    } else {
+      linkName = otherModel.getTableName() + "_" + model.getTableName();
     }
 
     var numReady = 0;
 
-    model.once('ready', function() {
-      r.table(linkName).indexList().run().then(function(result) {
-        r.table(otherModel.getTableName()).indexWait("notid2").run().then(function() {
-          done();
-        }).error(done);
-      }).error(done);
-    });
+    return model.ready()
+      .then(function() {
+        return Promise.all([
+          r.table(linkName).indexList().run(),
+          r.table(otherModel.getTableName()).indexWait("notid2").run()
+        ]);
+      });
   });
+
   it('_apply is reserved ', function() {
     var model = thinky.createModel(modelNames[0], { id: String, notid1: String }, {init: false});
 
@@ -554,58 +619,77 @@ describe("Joins", function() {
     assert.throws(function() {
       model.hasOne(otherModel, "_apply", "notid1", "notid2", {init: false});
     }, function(error) {
-      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.")
+      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.");
     });
+
     assert.throws(function() {
       model.hasMany(otherModel, "_apply", "notid1", "notid2", {init: false});
     }, function(error) {
-      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.")
+      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.");
     });
+
     assert.throws(function() {
       model.belongsTo(otherModel, "_apply", "notid1", "notid2", {init: false});
     }, function(error) {
-      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.")
+      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.");
     });
+
     assert.throws(function() {
       model.hasAndBelongsToMany(otherModel, "_apply", "notid1", "notid2", {init: false});
     }, function(error) {
-      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.")
+      return (error instanceof Error) && (error.message === "The field `_apply` is reserved by thinky. Please use another one.");
     });
   });
 });
 
-describe('define', function(){
+describe('define', function() {
   afterEach(cleanTables);
 
   it('Should be added on the document', function(done) {
     var Model = thinky.createModel(modelNames[0], { id: String, num: Number }, {init: false});
-    Model.define('foo', function() { done() });
+    Model.define('foo', function() { done(); });
     var doc = new Model({});
     doc.foo();
   });
+
   it('this should refer to the doc', function(done) {
     var str = util.s8();
     var Model = thinky.createModel(modelNames[0], { id: String, num: Number }, {init: false});
-    Model.define('foo', function() { assert.equal(this.id, str); done() });
+    Model.define('foo', function() { assert.equal(this.id, str); done(); });
     var doc = new Model({id: str});
     doc.foo();
   });
 });
-describe('static', function(){
+
+describe('static', function() {
   afterEach(cleanTables);
 
   it('Should be added on the model', function(done) {
-    var Model = thinky.createModel(modelNames[0], { id: String, num: Number }, {init: false});
-    Model.defineStatic('foo', function() { done() });
+    var Model = thinky.createModel(modelNames[0], {
+      id: String,
+      num: Number
+    }, {
+      init: false
+    });
+
+    Model.defineStatic('foo', function() { done(); });
     Model.foo();
   });
+
   it('this should refer to the model', function(done) {
-    var Model = thinky.createModel(modelNames[0], { id: String, num: Number }, {init: false});
-    Model.defineStatic('foo', function() { this.bar() });
-    Model.defineStatic('bar', function() { done() });
+    var Model = thinky.createModel(modelNames[0], {
+      id: String,
+      num: Number
+    }, {
+      init: false
+    });
+
+    Model.defineStatic('foo', function() { this.bar(); });
+    Model.defineStatic('bar', function() { done(); });
     Model.foo();
   });
-  it('Should be added on the model\'s queries', function(done) {
+
+  it('Should be added on the model\'s queries', function() {
     var Model = thinky.createModel(modelNames[0], { id: String });
     var Other = thinky.createModel(modelNames[1], { id: String });
 
@@ -613,71 +697,91 @@ describe('static', function(){
     Other.belongsTo(Model, 'model', 'modelId', 'id');
 
     Other.defineStatic('foo', function() {
-      return this.merge({bar: true})
+      return this.merge({ bar: true });
     });
 
     var doc1 = new Model({});
-    var doc2 = new Other({model: doc1});
+    var doc2 = new Other({ model: doc1 });
 
-    doc2.saveAll().then(function() {
-      return Model.getJoin({
-        other: {
-          _apply: function(query) {
-            return query.foo()
+    return doc2.saveAll()
+      .then(function() {
+        return Model.getJoin({
+          other: {
+            _apply: function(query) {
+              return query.foo();
+            }
           }
-        }
-      }).run()
-    }).then(function(docs) {
-      assert.equal(docs[0].other.bar, true);
-      done()
-    });
+        }).run();
+      }).then(function(docs) {
+        assert.equal(docs[0].other.bar, true);
+      });
   });
 });
-describe('ensureIndex', function(){
+
+describe('ensureIndex', function() {
   afterEach(cleanTables);
 
-  it('should add an index', function(done) {
+  it('should add an index', function() {
     var Model = thinky.createModel(modelNames[0], { id: String, num: Number });
     Model.ensureIndex("num");
+
     var doc = new Model({});
-    doc.save().then(function(result) {
-      Model.orderBy({index: "num"}).run().then(function(result) {
-        done();
+    return doc.save()
+      .then(function(result) {
+        return Model.orderBy({ index: "num" }).run();
+      });
+  });
+
+  it('should add an index with multi', function() {
+    var Model = thinky.createModel(modelNames[0], {
+      id: String,
+      nums: [ Number ]
+    });
+
+    Model.ensureIndex("nums", function(doc) {
+      return doc("nums");
+    }, {
+      multi: true
+    });
+
+    var doc = new Model({ nums: [1,2,3] });
+    return doc.save()
+      .then(function(result) {
+        return Model.getAll(1, {index: "nums"}).run();
+      })
+      .then(function(result) {
+        assert.equal(result.length, 1);
+        return Model.getAll(2, {index: "nums"}).run();
+      })
+      .then(function(result) {
+        assert.equal(result.length, 1);
+      });
+  });
+
+  it('should accept ensureIndex(name, opts)', function() {
+    var Model = thinky.createModel(modelNames[0], {
+      id: String,
+      location: type.point()
+    });
+
+    Model.ensureIndex("location", {geo: true});
+
+    var doc = new Model({location: [1,2]});
+    return doc.save()
+      .then(function(result) {
+        return Model.getIntersecting(r.circle([1,2], 1), {index: "location"}).run();
+      })
+      .then(function(result) {
+        assert.equal(result.length, 1);
+        return Model.getIntersecting(r.circle([3,2], 1), {index: "location"}).run();
+      })
+      .then(function(result) {
+        assert.equal(result.length, 0);
       });
     });
-  });
-  it('should add an index with multi', function(done) {
-    var Model = thinky.createModel(modelNames[0], { id: String, nums: [Number] });
-    Model.ensureIndex("nums", function(doc) { return doc("nums") }, {multi: true});
-    var doc = new Model({nums: [1,2,3]});
-    doc.save().then(function(result) {
-      return Model.getAll(1, {index: "nums"}).run()
-    }).then(function(result) {
-      assert.equal(result.length, 1);
-      return Model.getAll(2, {index: "nums"}).run()
-    }).then(function(result) {
-      assert.equal(result.length, 1);
-      done();
-    });
-  });
-  it('should accept ensureIndex(name, opts)', function(done) {
-    var Model = thinky.createModel(modelNames[0], { id: String, location: type.point() });
-    Model.ensureIndex("location", {geo: true});
-    var doc = new Model({location: [1,2]});
-    doc.save().then(function(result) {
-      return Model.getIntersecting(r.circle([1,2], 1), {index: "location"}).run()
-    }).then(function(result) {
-      assert.equal(result.length, 1);
-      return Model.getIntersecting(r.circle([3,2], 1), {index: "location"}).run()
-    }).then(function(result) {
-      assert.equal(result.length, 0);
-      done();
-    });
-  });
-
 });
 
-describe('virtual', function(){
+describe('virtual', function() {
   afterEach(cleanTables);
 
   it('pass schema validation', function() {
@@ -689,6 +793,7 @@ describe('virtual', function(){
       }
     });
   });
+
   it('Generate fields', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
@@ -696,15 +801,15 @@ describe('virtual', function(){
       numVirtual: {
         _type: 'virtual',
         default: function() {
-          return this.num+2
+          return this.num + 2;
         }
       }
     });
-    var doc = new Model({
-      num: 1
-    })
+
+    var doc = new Model({ num: 1 });
     assert.equal(doc.numVirtual, 3);
   });
+
   it('Generate fields -- manually', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
@@ -712,19 +817,19 @@ describe('virtual', function(){
       numVirtual: {
         _type: 'virtual',
         default: function() {
-          return this.num+2
+          return this.num + 2;
         }
       }
     });
-    var doc = new Model({
-      num: 1
-    })
+
+    var doc = new Model({ num: 1 });
     assert.equal(doc.numVirtual, 3);
-    doc.num = 2
+    doc.num = 2;
     assert.equal(doc.numVirtual, 3);
     doc.generateVirtualValues();
     assert.equal(doc.numVirtual, 4);
   });
+
   it('Validate fields', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: String,
@@ -733,12 +838,12 @@ describe('virtual', function(){
         _type: 'virtual'
       }
     });
-    var doc = new Model({
-      num: 1
-    })
+
+    var doc = new Model({ num: 1 });
     doc.validate();
   });
-  it('Virtual fields should not be saved', function(done) {
+
+  it('Virtual fields should not be saved', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: Number,
       num: Number,
@@ -746,47 +851,55 @@ describe('virtual', function(){
         _type: 'virtual'
       }
     });
+
     var doc = new Model({
       id: 1,
       num: 1,
       numVirtual: 3
-    })
-    doc.save().then(function(result) {
-      return Model.get(1).execute();
-    }).then(function(result) {
-      assert.equal(result.numVirtual, undefined);
-      done();
-    }).error(done);
+    });
+
+    return doc.save()
+      .then(function(result) {
+        return Model.get(1).execute();
+      })
+      .then(function(result) {
+        assert.equal(result.numVirtual, undefined);
+      });
   });
-  it('Virtual fields should not be saved but still regenerated once retrieved', function(done) {
+
+  it('Virtual fields should not be saved but still regenerated once retrieved', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: Number,
       num: Number,
       numVirtual: {
         _type: 'virtual',
         default: function() {
-          return this.num+2
+          return this.num + 2;
         }
       }
     });
+
     var doc = new Model({
       id: 1,
       num: 1
-    })
-    assert.equal(doc.numVirtual, 3);
-    doc.save().then(function(result) {
-      assert.equal(result.numVirtual, 3);
-      return Model.get(1).execute()
-    }).then(function(result) {
-      assert.equal(result.numVirtual, undefined);
-      return Model.get(1).run()
-    }).then(function(result) {
-      assert.equal(result.numVirtual, 3);
+    });
 
-      done();
-    }).error(done);
+    assert.equal(doc.numVirtual, 3);
+    return doc.save()
+      .then(function(result) {
+        assert.equal(result.numVirtual, 3);
+        return Model.get(1).execute();
+      })
+      .then(function(result) {
+        assert.equal(result.numVirtual, undefined);
+        return Model.get(1).run();
+      })
+      .then(function(result) {
+        assert.equal(result.numVirtual, 3);
+      });
   });
-  it('Virtual fields should not be saved but should be put back later (if no default)', function(done) {
+
+  it('Virtual fields should not be saved but should be put back later (if no default)', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: Number,
       num: Number,
@@ -794,20 +907,23 @@ describe('virtual', function(){
         _type: 'virtual'
       }
     });
+
     var doc = new Model({
       id: 1,
       num: 1,
       numVirtual: 10
-    })
-    doc.save().then(function(result) {
-      assert.equal(result.numVirtual, 10);
-      return Model.get(1).execute()
-    }).then(function(result) {
-      assert.equal(result.numVirtual, undefined);
+    });
 
-      done();
-    }).error(done).catch(done);
+    return doc.save()
+      .then(function(result) {
+        assert.equal(result.numVirtual, 10);
+        return Model.get(1).execute();
+      })
+      .then(function(result) {
+        assert.equal(result.numVirtual, undefined);
+      });
   });
+
   it('Virtual fields should be genrated after other default values', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: Number,
@@ -830,12 +946,12 @@ describe('virtual', function(){
         }
       }
     });
-    var doc = new Model({
-      id: 1
-    })
+
+    var doc = new Model({ id: 1 });
     assert.equal(doc.numVirtual, 3);
     assert.equal(doc.anumVirtual, 3);
   });
+
   it('Virtual fields should be not be generated if a parent is undefined', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: Number,
@@ -848,12 +964,12 @@ describe('virtual', function(){
         }
       }
     });
-    var doc = new Model({
-      id: 1
-    })
-    doc.generateVirtualValues()
+
+    var doc = new Model({ id: 1 });
+    doc.generateVirtualValues();
     assert.equal(doc.nested, undefined);
   });
+
   it('Virtual fields should not throw if a parent has the wrong type', function() {
     var Model = thinky.createModel(modelNames[0], {
       id: Number,
@@ -861,12 +977,9 @@ describe('virtual', function(){
         num: type.number().default(3)
       }).options({enforce_type: "none"})
     });
-    var doc = new Model({
-      id: 1,
-      ar: 3
-    })
+
+    var doc = new Model({ id: 1, ar: 3 });
     doc._generateDefault();
     assert.equal(doc.ar, 3);
   });
-
 });
